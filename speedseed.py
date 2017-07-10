@@ -1,6 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# __author__ = "Martin Weis"
+# __copyright__ = "GPL v.2 or later, see https://opensource.org/licenses/gpl-2.0.php"
+# __license__ = "GPL"
+# __version__ = "0.8"
+# __maintainer__ = "Martin Weis"
+# __email__ = "speedseed.program.mweis@spamgourmet.com"
+# __status__ = "Production"
+
 import cv2
 import sys
 import numpy

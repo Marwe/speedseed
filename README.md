@@ -5,6 +5,9 @@ This script was used in [@weis2013atb]. See [weis2013atb.bib bibtex file](./weis
 
     Usage: use option -h
 
+You get some displays to manually choose thresholds (see stdout for chosen parameters).
+Options `-d -g` suppress the display.
+
 ## References
 
 Weis, M., M. Schwarz, and S. Böttinger. 2013. Analyse der Gutentmischung auf dem Vorbereitungsboden im Mähdrescher mittels Hochgeschwindigkeitsaufnahmen. 
