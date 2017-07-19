@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# __author__ = "Martin Weis"
-# __copyright__ = "GPL v.2 or later, see https://opensource.org/licenses/gpl-2.0.php"
-# __license__ = "GPL"
-# __version__ = "0.8"
-# __maintainer__ = "Martin Weis"
-# __email__ = "speedseed.program.mweis@spamgourmet.com"
-# __status__ = "Production"
-
 import cv2
+import cv2.cv as cv # for missing constants
 import sys
 import numpy
 import argparse
@@ -27,8 +20,8 @@ import time
 
 #TODO : -d and -g: set to store_true
 
-parser = argparse.ArgumentParser(description='Process RGB images with HSV thresholding',epilog='writes out the processed images with suffix extensions')
-parser.add_argument('-d', '--display', action="store_false", dest='display',
+parser = argparse.ArgumentParser(description='Process R/IR/DIFF images and do row + plant in the row detection',epilog='writes out the features to stdout and a csv')
+parser.add_argument('-d', '--display', action="store_true", dest='display',
                    help='display the images in a viewer')
 parser.add_argument('-g', '--gui', action="store_false", dest='gui',
                    help='open interactive gui')
@@ -36,40 +29,56 @@ parser.add_argument('-k', '--keypress', action="store_false", dest='keypress',
                    help='wait for key')
 parser.add_argument('-K', '--keytimeout', type=int, default=500, dest='keytimeout',
                    help='timeout for key in ms')
-parser.add_argument('-n', '--numimages',default=1, type=int, dest='numimages',
-                   help='number of (thresholded) images to combine') 
-parser.add_argument('-N', '--stackthreshold',default=-1, type=int, dest='stackthreshold',
-        help='threshold for combined image <= numimages (default: -1 => set stackthreshold=numimages)')
-parser.add_argument('-D', '--donthsvtrans', action="store_false", dest='donthsvtrans',
-                   help='Do not HSV-transform image (use RGB, thresholds are then V->B, S->G, H->R)')
-parser.add_argument('-m', '--minh',default=20, type=int, choices=range(0,256), dest='minh',
-                   help='min H threshold')
-parser.add_argument('-M', '--maxh',default=170, type=int, choices=range(0,256), dest='maxh',
-                   help='max H threshold, max 180 for H')
-parser.add_argument('-s', '--mins',default=35, type=int, choices=range(0,256), dest='mins',
-                   help='min S threshold')
-parser.add_argument('-S', '--maxs',default=255, type=int, choices=range(0,256), dest='maxs',
-                   help='max S threshold')
-parser.add_argument('-v', '--minv',default=50, type=int, choices=range(0,256), dest='minv',
-                   help='min V threshold')
-parser.add_argument('-V', '--maxv',default=180, type=int, choices=range(0,256), dest='maxv',
-                   help='max V threshold')
+parser.add_argument('-C', '--channel', type=int, default=0, dest='channel', choices=range(0,3),
+                   help='channel, 0=blue, 1=green')
+
+#parser.add_argument('-m', '--minh',default=20, type=int, choices=range(0,256), dest='minh',
+                   #help='min H threshold')
+#parser.add_argument('-M', '--maxh',default=170, type=int, choices=range(0,180), dest='maxh',
+                   #help='max H threshold')
+#parser.add_argument('-s', '--mins',default=35, type=int, choices=range(0,256), dest='mins',
+                   #help='min S threshold')
+#parser.add_argument('-S', '--maxs',default=255, type=int, choices=range(0,256), dest='maxs',
+                   #help='max S threshold')
+#parser.add_argument('-v', '--minv',default=50, type=int, choices=range(0,256), dest='minv',
+                   #help='min V threshold')
+#parser.add_argument('-V', '--maxv',default=180, type=int, choices=range(0,256), dest='maxv',
+                   #help='max V threshold')
+
+parser.add_argument('-b', '--minb',default=20, type=int, choices=range(0,255), dest='minb',
+                   help='min blue threshold')
+parser.add_argument('-B', '--maxb',default=255, type=int, choices=range(0,255), dest='maxb',
+                   help='max blue threshold')
 parser.add_argument('-x', '--xul',default=0, type=int, dest='xul',
-                   help='x of UL corner of ROI rectanble')
+                   help='x of UL corner of ROI rectangle')
 parser.add_argument('-y', '--yul',default=0, type=int, dest='yul',
-                   help='y of UL corner of ROI rectanble')
-parser.add_argument('-X', '--Xsize',default=0, type=int, dest='X',
+                   help='y of UL corner of ROI rectangle')
+parser.add_argument('-X', '--Xsize',default=10000, type=int, dest='X',
                    help='x size of ROI rectangle')
-parser.add_argument('-Y', '--Ysize',default=0, type=int, dest='Y',
+parser.add_argument('-Y', '--Ysize',default=10000, type=int, dest='Y',
                    help='y size of ROI rectangle')
-parser.add_argument('-a', '--minarea',default=0, type=int, dest='minarea',
-                   help='min area threshold')
-parser.add_argument('-A', '--maxarea',default=-1, type=int, dest='maxarea',
-                   help='max area threshold')
-parser.add_argument('-o', '--opening',default=0, type=int, choices=range(-31,32,2)+[0], dest='opening',
-                   help='morphological opening, size of element. negative values: closing')
-parser.add_argument('-p', '--prefix', default='', type=str, dest='prefix',
-                   help='prefix for the filenames of the results')
+parser.add_argument('-c', '--colhistthreshperc',default=25, type=int, choices=range(0,100), dest='colhistthreshperc',
+                   help='threshold for column histogram in percent')
+parser.add_argument('-r', '--rowhistthreshperc',default=25, type=int, choices=range(0,100), dest='rowhistthreshperc',
+                   help='threshold for row histogram in percent')
+parser.add_argument('-t', '--thresholdblue', action="store_true", dest='thresholdblue', 
+                   help='threshold image first with --minb --maxb thresholds  (default: directly use gray levels) ')
+parser.add_argument('-D', '--distancewrap', type=int, default=500, dest='distancewrap', 
+                   help='distance [pixel] to wrap the histogram (add up object pixels with this distance)')
+parser.add_argument('-s', '--saveresults', action="store_true", dest='saveresults', 
+                   help='save results (images)')
+
+
+#parser.add_argument('-a', '--minarea',default=0, type=int, dest='minarea',
+                   #help='min area threshold')
+#parser.add_argument('-A', '--maxarea',default=-1, type=int, dest='maxarea',
+                   #help='max area threshold')
+#parser.add_argument('-o', '--opening',default=0, type=int, choices=range(-31,32,2)+[0], dest='opening',
+                   #help='morphological opening, size of element. negative values: closing')
+#parser.add_argument('-p', '--prefix', default='', type=str, dest='prefix',
+                   #help='prefix for the filenames of the results')
+#parser.add_argument('-w', '--writedb', default='', type=str, dest='writedb',
+                   #help='csv DB name to store the data')
 parser.add_argument(metavar='I', type=str, nargs='*', default=["/tmp/sample.png"], dest='imagefilenames',
                    help='RGB images to be processed')
 args = parser.parse_args()
@@ -79,44 +88,35 @@ def checkminmax(value,minval=0,maxval=255,name="value"):
     res=value
     if(value<minval):
         res=minval
-        print "warning: invalid "+name+": "+value+",setting to "+res
+        print "warning: invalid "+name+": "+str(value)+",setting to "+str(res)
     if(value>maxval):
         res=maxval
-        print "warning: invalid "+name+": "+value+",setting to "+res
+        print "warning: invalid "+name+": "+str(value)+",setting to "+str(res)
     return res
 
 #print "prefix: ("+args.prefix+")"
-display=args.display
-keypress=args.keypress
-keytimeout=args.keytimeout
-args.numimages=checkminmax(args.numimages,1,len(args.imagefilenames),"numimages range (max=nr of images)")
-numimages=args.numimages
-if -1 == args.stackthreshold:
-    args.stackthreshold=args.numimages
-args.stackthreshold=checkminmax(args.stackthreshold,1,args.numimages,"stackthreshold range")
-areamm=[checkminmax(args.minarea,0,65000*65000,"minarea"),checkminmax(args.maxarea,-1,65000*65000,"maxarea")]
-print args.imagefilenames, len(args.imagefilenames)
+#display=args.display
+#keypress=args.keypress
+#keytimeout=args.keytimeout
+#numimages=checkminmax(args.numimages,1,len(args.imagefilenames),"numimages range (max=nr of images)")
+#areamm=[checkminmax(args.minarea,0,65000*65000,"minarea"),checkminmax(args.maxarea,-1,65000*65000,"maxarea")]
+## print args.imagefilenames, len(args.imagefilenames)
+#print "areaminmax: "+str(areamm)
+#optfilename=time.strftime("shaperecolass_%Y-%m-%d-%H-%M-%S",time.gmtime())+".log"
+#with open(optfilename, 'wb') as csvfile:
+        #print "optfile: "+optfilename
+        #csvwriter = csv.writer(csvfile, delimiter=" ", quotechar='', quoting=csv.QUOTE_NONE)
+        #csvwriter.writerow(sys.argv)
 
-# check max H 180, if HSV
-if args.donthsvtrans is False:
-    args.maxh=checkminmax(args.maxh,0,180)
-
-print "areaminmax: "+str(areamm)
-optfilename=time.strftime("speedseed_%Y-%m-%d-%H-%M-%S",time.gmtime())+".log"
-with open(optfilename, 'wb') as csvfile:
-        print "optfile: "+optfilename
-        csvwriter = csv.writer(csvfile, delimiter=" ", quotechar='', quoting=csv.QUOTE_NONE)
-        csvwriter.writerow(sys.argv)
-
-# morphology requested?
-#print "morphology: ",args.opening
-morphology=False
-op=cv2.MORPH_OPEN
-if args.opening !=0:
-    morphology=True
-    se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (abs(args.opening),abs(args.opening)))    
-    if args.opening<0:
-        op=cv2.MORPH_CLOSE
+## morphology requested?
+##print "morphology: ",args.opening
+#morphology=False
+#op=cv2.MORPH_OPEN
+#if args.opening !=0:
+    #morphology=True
+    #se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (abs(args.opening),abs(args.opening)))    
+    #if args.opening<0:
+        #op=cv2.MORPH_CLOSE
 
 
 #VSH?
@@ -182,14 +182,14 @@ if args.opening !=0:
 
 class ShowImg(object):
     def __init__(self, image, name="display", show=False, key=False, keytime=500):
-        if display:
+        if args.display:
             cv2.namedWindow(name);
             cv2.imshow(name, image)
             if key:
                 cv2.waitKey(0)
             else:
                 cv2.waitKey(keytime)
-            cv2.destroyWindow(name)
+            cv2.destroyWindow(name)        
 
 class HSVthresh(object):
     """An HSV thresholder class"""
@@ -212,30 +212,23 @@ class HSVthresh(object):
     _op=cv2.MORPH_OPEN
     _se=cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
     moments=None
-    shapefeat=[]
-    shapefeatnames=[]
-    def __init__(self, bgrimage,roi=[0,0,0,0],display=False,keypress=False,keytimeout=0,donthsvtrans=False):
+    def __init__(self, bgrimage,roi=[0,0,0,0],display=False,keypress=False,keytimeout=0):
         self.display=display
         self.keypress=keypress
         self.keytimeout=keytimeout
         self.imgorig=bgrimage
         self.setroi(roi)
-        # init hsv image, if not donthsvtrans
-        self.hsvtrans(self.imgorig, donthsvtrans=donthsvtrans)
-        if donthsvtrans is True:
-            self.hsvth [0, 255, 0, 255, 0, 250]
+        # init hsv image
+        self.hsvtrans(self.imgorig)
         # init result matrices
         self.hsvtc=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1], 3), self.vshimage[0].dtype)
         self.sumimg=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
         self.threshimg=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
         self.threshimgmorph=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
         self.threshres=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
-    def hsvtrans(self, bgrimage, donthsvtrans=False):
+    def hsvtrans(self, bgrimage):
         print "hsvtrans"
-	if donthsvtrans is False: # do HSV transform
-        	self.vshimage=cv2.cvtColor(bgrimage, cv2.COLOR_BGR2HSV)
-	else: # use as is
-		self.vshimage=bgrimage
+        self.vshimage=cv2.cvtColor(bgrimage, cv2.COLOR_BGR2HSV)
         self.vshchannels=self.splitchannel(self.vshimage)
         return self.vshimage
     def setroi(self,roicoord):
@@ -487,7 +480,6 @@ class HSVthresh(object):
             #radii.append(radius)
 #            cv2.circle(self.imgorig,center,radius,(255,0,0))                
         #self.centersradii=zip(centers,radii)
-        self.shapefeatnames=sf.keys()
         return self.shapefeat
     def optflow(self,previmg,currentimg):
         #cv2.calcOpticalFlowPyrLK(prevImg, nextImg, prevPts[, nextPts[, status[, err[, winSize[, maxLevel[, criteria[, flags[, minEigThreshold]]]]]]]]) → nextPts, status, err
@@ -521,15 +513,10 @@ class HSVthresh(object):
 ##        elif (value == 2):
 ##                print "Showing V";
 
-csvheaderwritten=False
-if len(sys.argv) > 1:
-    imgfilename = sys.argv[1]
-else:
-    imgfilename = "/tmp/sample.png"
 
 # init hsvthresh stack
-stack=list()
-previmg=None
+#stack=list()
+#previmg=None
 roi=[args.xul, args.yul, args.X, args.Y]
 
 for filecnt in range(len(args.imagefilenames)):
@@ -538,27 +525,102 @@ for filecnt in range(len(args.imagefilenames)):
     if None==image:
         print "error reading image"
         continue
-    #print "tresholds:", args.minv, args.maxv, args.mins, args.maxs, args.minh, args.maxh
-    ht=HSVthresh(image,roi,display=args.display,keypress=args.keypress,keytimeout=args.keytimeout)
-    ht.threshhsvinterval(args.minh, args.maxh, args.mins, args.maxs, args.minv, args.maxv)
-    if morphology:
-        ht.morphthreshimg(se,op)
-    if args.gui:
-        ht.gui()
-    if filecnt<numimages:
-        stack.append(ht)
-        print "filling stack ",len(stack)
+    
+    # check parameters
+    imageshape=image.shape
+    roix=checkminmax(args.xul,0,imageshape[0])
+    roiy=checkminmax(args.yul,0,imageshape[1])
+    roiX=checkminmax(args.xul+args.X,0,imageshape[0])
+    roiY=checkminmax(args.yul+args.Y,0,imageshape[1])
+    
+    # threshold the blue channel
+    # optionally work on grayscale, might be faster
+    if args.thresholdblue:
+        ret, binimg=cv2.threshold(image[roix:roiX,roiy:roiY,args.channel],args.minb,args.maxb, cv2.THRESH_BINARY)
+    
+        # cv.Reduce(src, dst, dim=-1, op=CV_REDUCE_SUM) → None¶
+        colhist=cv2.reduce(src=binimg,dim=0,rtype=cv.CV_REDUCE_AVG)
     else:
-        stack[filecnt%numimages]=ht
-        #print "using stack ",filecnt%numimages
-    if previmg is None:
-        previmg=ht.threshres
+        #TODO: needs to be scaled before thresholding, or adapt the threshold values?
+        binimg=image[roix:roiX,roiy:roiY,args.channel]
+        colhist=cv2.reduce(src=binimg,dim=0,rtype=cv.CV_REDUCE_AVG)
+    
+    # threshold histogram based on percentage of columns
+    colselected=(colhist>255*args.colhistthreshperc/100)
+    print (float(sum(colselected[0]))/binimg.shape[1])
+    colselbinimg=numpy.compress(colselected[0],binimg,1)
+    
+    rowhist=cv2.reduce(src=colselbinimg,dim=1,rtype=cv.CV_REDUCE_AVG)
+    rowselected=(rowhist>255*args.rowhistthreshperc/100)
+    
+    # TODO: evaluate the positions, 
+    # wrap rowhist
+    
+    
+
+    print (float(sum(rowselected))/binimg.shape[0])
+    
+    # show selection
+    if (args.saveresults|args.display):
+        chred=numpy.resize(numpy.array(numpy.repeat(rowhist,binimg.shape[1])),binimg.shape)
+        chgreen=numpy.transpose(numpy.resize(numpy.array(numpy.repeat(colselected*255,binimg.shape[0]), dtype=numpy.uint8),[binimg.shape[1],binimg.shape[0]]))
+        combimg=cv2.merge((binimg,chred,chgreen))
+        outfilename=args.imagefilenames[filecnt]+".rowcol.png"
+        cv2.imwrite(outfilename, combimg)
+        
+    if args.display:
+        print ("display on")
+        #ShowImg(image,"orig",show=True,key=args.keypress,keytime=args.keytimeout)
+        # create an rgb image from binimg
+        # cv2.cvtColor(binimg,cv.CV_GRAY2BGR)
+        # red channel is row wise
+        ShowImg(combimg,show=True,key=args.keypress,keytime=args.keytimeout)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+sys.exit(0)
+if True: # jsut for the indent
+    #print "tresholds:", args.minv, args.maxv, args.mins, args.maxs, args.minh, args.maxh
+    #ht=HSVthresh(image[2],roi,display=args.display,keypress=args.keypress,keytimeout=args.keytimeout)
+    #ht.threshhsvinterval(args.minh, args.maxh, args.mins, args.maxs, args.minv, args.maxv)
+    #if morphology:
+        #ht.morphthreshimg(se,op)
+    #if args.gui:
+        #ht.gui()
+    #if filecnt<numimages:
+        #stack.append(ht)
+        #print "filling stack ",len(stack)
+    #else:
+        #stack[filecnt%numimages]=ht
+        ##print "using stack ",filecnt%numimages
+    #if previmg is None:
+        #previmg=ht.threshres
     # iterate over stack, adding thresholds
     #st=numpy.zeros((ht.threshimg.shape[0], ht.threshimg.shape[1]),numpy.uint8)
+    
     st=stack[0].threshimg/255
     for scnt in range(len(stack)):
         st+=stack[scnt].threshres/255
-    ret, allt=cv2.threshold(st,args.stackthreshold,255, cv2.THRESH_BINARY)
+    ret, allt=cv2.threshold(st,len(stack),255, cv2.THRESH_BINARY)
     # show results?
     #ShowImg(ht.hsvtc,"hsvthresh",display,keypress,keytimeout)
     #ShowImg(ht.sumimg,"sumimg",display,keypress,keytimeout)
@@ -599,13 +661,6 @@ for filecnt in range(len(args.imagefilenames)):
 
     # positions
     shapef=ht.shapefeatures(ht.threshres)
-    if csvheaderwritten is not True:
-        outfilename="postions_header.csv"
-        with open(outfilename, 'wb') as csvfile:
-            csvwriter = csv.writer(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            csvwriter.writerow(shapef[0].keys())
-            csvheaderwritten=True
-        
     outfilename=outfilenamebase+".postions.csv"
     with open(outfilename, 'wb') as csvfile:
         print "csvfile: "+outfilename
@@ -631,69 +686,3 @@ for filecnt in range(len(args.imagefilenames)):
                 rowdat=zip(*sorted(sf.items()))[1]
                 csvwriter.writerow(rowdat)
 
-##vshimage=cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-# http://opencv.willowgarage.com/documentation/c/imgproc_miscellaneous_image_transformations.html?highlight=cvtcolor#cvCvtColor
-# http://www.shervinemami.info/colorConversion.html#colorWheelHSV
-# Also note in these specs that if you use cvCvtColor with HSV or HLS color formats on standard (8-bit 3-channel) color images, where each component is stored as 8 bits (0 to 255), then the H component (Hue, which specifies the color such as Red or Yellow or Pink or Purple) will be limited to just 0 to 180 and therefore will have lost some information. For many applications, this will not be noticeable, but in applications that need the full range of colors, or that convert from BGR to HSV before an operation and then convert back to BGR, it is recommended to either use 32 bits per channel (96 bits per pixel) or a different HSV format that stores the Hue component between 0 to 255 instead of just 0 to 180. Conversion functions between BGR and HSV that use the full range of Hues from 0 to 255 are available at http://www.shervinemami.info/colorConversion.html#fullHueRange. 
-# note: since default order is BGR, this is ordered VSH?
-#cv2.imwrite("/tmp/pycvout.png", vshimage)
-##vshchannels=cv2.split(vshimage)
-#for i in [0, 1, 2]:
-        #cv2.namedWindow("HSV");
-        #cv2.createTrackbar("HSV", "Channel", 0, 2, channelName);
-        #ret, chimg=cv2.threshold(vshchannels[i], HSVt[i*2], 255, cv2.THRESH_BINARY)
-        #windowname="disp "+str(i) + " " + str(HSVt[i*2]) + " " + str(HSVt[i*2+1])
-        #cv2.imshow(windowname, vshchannels[i]); # vshchannels[i])
-#print type(vshchannels)
-
-##print "vshchannels:" + str(vshchannels[0].shape)
-# new empty one, images are numpy arrays
-##tr=numpy.zeros((imgshape[0], imgshape[1], 3), vshchannels[0].dtype)
-##sumimg=numpy.zeros((imgshape[0], imgshape[1]), vshchannels[0].dtype)
-##print tr.shape
-##for i in range(3):
-##    #print type(tr[i])
-##    print [i, HSVt[i*2], HSVt[i*2+1]]
-##    ret, chimg=cv2.threshold(vshchannels[i], HSVt[i*2], 255, cv2.THRESH_BINARY)
-##    sumimg+=chimg/3
-##    print "chimg",chimg.shape,numpy.min(chimg),numpy.max(chimg)
-##    tr[0:imgshape[0],0:imgshape[1],i]=chimg
-##    ShowImg(chimg,"hsv-"+str(1),display,keypress,keytimeout)
-
-#ShowImg(chimg,"",display,keypress,keytimeout)
-#if display:
-#        cv2.namedWindow("disp",cv2.WINDOW_AUTOSIZE)
-#        cv2.imshow("disp", tr)
-#        if keypress:
-#            cv2.waitKey(0)
-#        else:
-#            cv2.waitKey(keytimeout)
-#        cv2.imshow("disp", sumimg)
-#        if keypress:
-#            cv2.waitKey(0)
-#        else:
-#            cv2.waitKey(keytimeout)
-# threshold to 255
-##ret, timg=cv2.threshold(sumimg, 254, 255, cv2.THRESH_BINARY)
-
-#wid=cv2.startWindowThread()
-
-#lowerBound = cv2.(120, 80, 100);
-#upperBound = cv2.Scalar(140, 85, 110);
-
-# this gives you the mask for those in the ranges you specified,
-# but you want the inverse, so we'll add bitwise_not...
-#cv.InRange(vshimage, lowerBound, upperBound, HSVtimg);
-#cv.Not(HSVtimg, );
-#cv.InRange(cv_im, lowerBound, upperBound, cv_rgb_thresh);
-#cv.Not(cv_rgb_thresh, cv_rgb_thresh);
-
-#cv2.(vshimage, Himg, Simg, Vimg)
-#cv2.threshold()
-
-#loadImage("/tmp/V1019_000380.png")
-##if display:
-##        cv2.destroyWindow('HSV')
-##        cv2.destroyWindow('orig')
-##        cv2.destroyWindow('disp')
-cv2.destroyAllWindows()
