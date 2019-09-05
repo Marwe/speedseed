@@ -86,7 +86,7 @@ class ImgProc(object):
             # set imgorig to black pixel
             self.imgorig=numpy.zeros((1, 1, 3), numpy.uint8)
     def imreadbgr(self,filename=None):
-        if None==filename:
+        if filename is None:
             self.ok=False
             self._metadata=None
         else:
@@ -94,7 +94,7 @@ class ImgProc(object):
             # read in unchanged, do not assume 3 channel images, also RGBA etc.
             # CV_LOAD_IMAGE_COLOR, CV_LOAD_IMAGE_GRAYSCALE, CV_LOAD_IMAGE_ANYCOLOR, CV_LOAD_IMAGE_ANYDEPTH, and CV_LOAD_IMAGE_UNCHANGED will be removed in future versions of OpenCV.
             img=cv2.imread(filename,cv2.IMREAD_UNCHANGED)
-            if None==img:
+            if img is None:
                 self.ok=False
                 self._metadata=None
             else:

@@ -335,7 +335,7 @@ class HSVthresh(object):
             self._se=se
         if op is not None:
             self._op=op
-        if self.threshimg!=None:
+        if self.threshimg is not None:
             self.threshimgmorph=cv2.morphologyEx(self.threshimg,self._op,self._se)
             self.threshres=self.threshimgmorph
         return self.threshimgmorph
@@ -535,7 +535,7 @@ roi=[args.xul, args.yul, args.X, args.Y]
 for filecnt in range(len(args.imagefilenames)):
     print filecnt,args.imagefilenames[filecnt]
     image=cv2.imread(args.imagefilenames[filecnt])
-    if None==image:
+    if image is None:
         print "error reading image"
         continue
     #print "tresholds:", args.minv, args.maxv, args.mins, args.maxs, args.minh, args.maxh
