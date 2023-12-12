@@ -12,6 +12,29 @@ Options `-d -g` suppress the display.
 
 This script computes the Excess Green Index from RGB images.
 
+## Run egi script in venv
+
+* create venv (one time)
+* activate
+* install opencv-python (one time)
+* run script
+* deactivate
+
+```
+python -m venv ~/.virtualenvs/egi
+. ~/.virtualenvs/egi/bin/activate
+pip3 install opencv-python
+egi.py -T /tmp/image.jpg
+deactivate
+```
+
+should yield something like 
+
+```
+imagefilename	threshold	covpix	covperc
+/tmp/image.jpg	46	458686	0.441751
+```
+
 # Appendix
 
 ## References

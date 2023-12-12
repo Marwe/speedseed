@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
 # __author__ = "Martin Weis"
@@ -29,60 +29,60 @@ import time
 
 parser = argparse.ArgumentParser(description='Process RGB images with HSV thresholding',epilog='writes out the processed images with suffix extensions')
 parser.add_argument('-d', '--display', action="store_false", dest='display',
-                   help='display the images in a viewer')
+        help='display the images in a viewer')
 parser.add_argument('-g', '--gui', action="store_false", dest='gui',
-                   help='open interactive gui')
+        help='open interactive gui')
 parser.add_argument('-k', '--keypress', action="store_false", dest='keypress',
-                   help='wait for key')
+        help='wait for key')
 parser.add_argument('-K', '--keytimeout', type=int, default=500, dest='keytimeout',
-                   help='timeout for key in ms')
+        help='timeout for key in ms')
 parser.add_argument('-n', '--numimages',default=1, type=int, dest='numimages',
-                   help='number of (thresholded) images to combine') 
+        help='number of (thresholded) images to combine') 
 parser.add_argument('-N', '--stackthreshold',default=-1, type=int, dest='stackthreshold',
         help='threshold for combined image <= numimages (default: -1 => set stackthreshold=numimages)')
 parser.add_argument('-D', '--donthsvtrans', action="store_false", dest='donthsvtrans',
-                   help='Do not HSV-transform image (use RGB, thresholds are then V->B, S->G, H->R)')
-parser.add_argument('-m', '--minh',default=20, type=int, choices=range(0,256), dest='minh',
-                   help='min H threshold')
-parser.add_argument('-M', '--maxh',default=170, type=int, choices=range(0,256), dest='maxh',
-                   help='max H threshold, max 180 for H')
-parser.add_argument('-s', '--mins',default=35, type=int, choices=range(0,256), dest='mins',
-                   help='min S threshold')
-parser.add_argument('-S', '--maxs',default=255, type=int, choices=range(0,256), dest='maxs',
-                   help='max S threshold')
-parser.add_argument('-v', '--minv',default=50, type=int, choices=range(0,256), dest='minv',
-                   help='min V threshold')
-parser.add_argument('-V', '--maxv',default=180, type=int, choices=range(0,256), dest='maxv',
-                   help='max V threshold')
+        help='Do not HSV-transform image (use RGB, thresholds are then V->B, S->G, H->R)')
+parser.add_argument('-m', '--minh',default=20, type=int, choices=list(range(0,256)), dest='minh',
+        help='min H threshold')
+parser.add_argument('-M', '--maxh',default=170, type=int, choices=list(range(0,256)), dest='maxh',
+        help='max H threshold, max 180 for H')
+parser.add_argument('-s', '--mins',default=35, type=int, choices=list(range(0,256)), dest='mins',
+        help='min S threshold')
+parser.add_argument('-S', '--maxs',default=255, type=int, choices=list(range(0,256)), dest='maxs',
+        help='max S threshold')
+parser.add_argument('-v', '--minv',default=50, type=int, choices=list(range(0,256)), dest='minv',
+        help='min V threshold')
+parser.add_argument('-V', '--maxv',default=180, type=int, choices=list(range(0,256)), dest='maxv',
+        help='max V threshold')
 parser.add_argument('-x', '--xul',default=0, type=int, dest='xul',
-                   help='x of UL corner of ROI rectanble')
+        help='x of UL corner of ROI rectanble')
 parser.add_argument('-y', '--yul',default=0, type=int, dest='yul',
-                   help='y of UL corner of ROI rectanble')
+        help='y of UL corner of ROI rectanble')
 parser.add_argument('-X', '--Xsize',default=0, type=int, dest='X',
-                   help='x size of ROI rectangle')
+        help='x size of ROI rectangle')
 parser.add_argument('-Y', '--Ysize',default=0, type=int, dest='Y',
-                   help='y size of ROI rectangle')
+        help='y size of ROI rectangle')
 parser.add_argument('-a', '--minarea',default=0, type=int, dest='minarea',
-                   help='min area threshold')
+        help='min area threshold')
 parser.add_argument('-A', '--maxarea',default=-1, type=int, dest='maxarea',
-                   help='max area threshold')
-parser.add_argument('-o', '--opening',default=0, type=int, choices=range(-31,32,2)+[0], dest='opening',
-                   help='morphological opening, size of element. negative values: closing')
+        help='max area threshold')
+parser.add_argument('-o', '--opening',default=0, type=int, choices=list(range(-31,32,2))+[0], dest='opening',
+        help='morphological opening, size of element. negative values: closing')
 parser.add_argument('-p', '--prefix', default='', type=str, dest='prefix',
-                   help='prefix for the filenames of the results')
+        help='prefix for the filenames of the results')
 parser.add_argument(metavar='I', type=str, nargs='*', default=["/tmp/sample.png"], dest='imagefilenames',
-                   help='RGB images to be processed')
+        help='RGB images to be processed')
 args = parser.parse_args()
-print args
+print(args)
 
 def checkminmax(value,minval=0,maxval=255,name="value"):
     res=value
     if(value<minval):
         res=minval
-        print "warning: invalid "+name+": "+value+",setting to "+res
+        print("warning: invalid "+name+": "+value+",setting to "+res)
     if(value>maxval):
         res=maxval
-        print "warning: invalid "+name+": "+value+",setting to "+res
+        print("warning: invalid "+name+": "+value+",setting to "+res)
     return res
 
 #print "prefix: ("+args.prefix+")"
@@ -95,18 +95,18 @@ if -1 == args.stackthreshold:
     args.stackthreshold=args.numimages
 args.stackthreshold=checkminmax(args.stackthreshold,1,args.numimages,"stackthreshold range")
 areamm=[checkminmax(args.minarea,0,65000*65000,"minarea"),checkminmax(args.maxarea,-1,65000*65000,"maxarea")]
-print args.imagefilenames, len(args.imagefilenames)
+print(args.imagefilenames, len(args.imagefilenames))
 
 # check max H 180, if HSV
 if args.donthsvtrans is False:
     args.maxh=checkminmax(args.maxh,0,180)
 
-print "areaminmax: "+str(areamm)
-optfilename=time.strftime("speedseed_%Y-%m-%d-%H-%M-%S",time.gmtime())+".log"
-with open(optfilename, 'wb') as csvfile:
-        print "optfile: "+optfilename
-        csvwriter = csv.writer(csvfile, delimiter=" ", quotechar='', quoting=csv.QUOTE_NONE)
-        csvwriter.writerow(sys.argv)
+print("areaminmax: "+str(areamm))
+optfilename=time.strftime("log_speedseed_%Y-%m-%d-%H-%M-%S",time.gmtime())+".log"
+with open(optfilename, 'w') as csvfile:
+    print("optfile: "+optfilename)
+    csvwriter = csv.writer(csvfile, delimiter=" ", quotechar='', quoting=csv.QUOTE_NONE)
+    csvwriter.writerow(list(sys.argv))
 
 # morphology requested?
 #print "morphology: ",args.opening
@@ -178,7 +178,7 @@ if args.opening !=0:
 ##            self.frame_idx += 1
 ##            self.prev_gray = frame_gray
 ##     
-        
+
 
 class ShowImg(object):
     def __init__(self, image, name="display", show=False, key=False, keytime=500):
@@ -226,16 +226,17 @@ class HSVthresh(object):
             self.hsvth [0, 255, 0, 255, 0, 250]
         # init result matrices
         self.hsvtc=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1], 3), self.vshimage[0].dtype)
-        self.sumimg=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
+        self.sumimg=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), dtype=float)
+        #self.vshimage[0].dtype)
         self.threshimg=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
         self.threshimgmorph=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
         self.threshres=numpy.zeros((self.vshimage.shape[0], self.vshimage.shape[1]), self.vshimage[0].dtype)
     def hsvtrans(self, bgrimage, donthsvtrans=False):
-        print "hsvtrans"
-	if donthsvtrans is False: # do HSV transform
-        	self.vshimage=cv2.cvtColor(bgrimage, cv2.COLOR_BGR2HSV)
-	else: # use as is
-		self.vshimage=bgrimage
+        print("hsvtrans")
+        if donthsvtrans is False: # do HSV transform
+            self.vshimage=cv2.cvtColor(bgrimage, cv2.COLOR_BGR2HSV)
+        else: # use as is
+            self.vshimage=bgrimage
         self.vshchannels=self.splitchannel(self.vshimage)
         return self.vshimage
     def setroi(self,roicoord):
@@ -264,14 +265,14 @@ class HSVthresh(object):
                 roi[3]=self.imgorig.shape[1]-roi[1]
         self.roi=roi
         if roiapply:
-            print "roiapply"
-            print self.roi
+            print("roiapply")
+            print(self.roi)
             #newbgr=numpy.zeros((self.bgrimage.shape[0], self.bgrimage.shape[1], 3), self.bgrimage[0].dtype)
             mask = numpy.zeros(self.imgorig.shape, dtype=numpy.uint8)
             roi_corners = numpy.array([[(roi[0],roi[1]),
-                                     (roi[0]+roi[2],roi[1]),
-                                     (roi[0]+roi[2],roi[1]+roi[3]),
-                                     (roi[0],roi[1]+roi[3])]], dtype=numpy.int32)
+                (roi[0]+roi[2],roi[1]),
+                (roi[0]+roi[2],roi[1]+roi[3]),
+                (roi[0],roi[1]+roi[3])]], dtype=numpy.int32)
             white = (255, 255, 255)
             cv2.fillPoly(mask, roi_corners, white)
             # apply the mask
@@ -287,7 +288,7 @@ class HSVthresh(object):
         self.morphthreshimg()
         ityp=cv2.getTrackbarPos("Channel", self.wcname)
         if (0<=ityp and 2>=ityp):
-            print type(self.hsvtc[:,:,ityp]), self.hsvtc[:,:,ityp]
+            print(type(self.hsvtc[:,:,ityp]), self.hsvtc[:,:,ityp])
             cv2.imshow(self.wname, self.hsvtc[:,:,ityp])
         if 3==ityp:
             cv2.imshow(self.wname, self.imgorig)
@@ -317,7 +318,7 @@ class HSVthresh(object):
             #print "thresholds fo channel %d: %d %d" % (i,self.hsvth[i*2],self.hsvth[i*2+1])
             tmpt=self.threshinterval(self.vshchannels[i],self.hsvth[i*2],self.hsvth[i*2+1])
             self.hsvtc[0:tmpt.shape[0],0:tmpt.shape[1],i]=tmpt
-            self.sumimg+=self.hsvtc[:,:,i]/3
+            self.sumimg+=self.hsvtc[:,:,i]/int(3)
         ret, self.threshimg=cv2.threshold(self.sumimg, 244, 255, cv2.THRESH_BINARY)
         self.threshres=self.threshimg
         return self.hsvtc
@@ -335,7 +336,7 @@ class HSVthresh(object):
             self._se=se
         if op is not None:
             self._op=op
-        if self.threshimg is not None:
+        if self.threshimg.all() is None:
             self.threshimgmorph=cv2.morphologyEx(self.threshimg,self._op,self._se)
             self.threshres=self.threshimgmorph
         return self.threshimgmorph
@@ -381,66 +382,66 @@ class HSVthresh(object):
     #def (self, wname="Display"):
     def dothreshhmin(self,value):
         if not (value>=0 and value<=179):
-            print "hmin out of range: "+str(value)
+            print("hmin out of range: "+str(value))
             return False
         if not (value<=self.hsvth[1]):
-            print "hmin > hmax, setting to hmax"
+            print("hmin > hmax, setting to hmax")
             value=self.hsvth[1]
             cv2.setTrackbarPos("Hmin",self.wcname,value)
         self.hsvth[0]=value
         self.updatedisp()
     def dothreshhmax(self,value):
         if not (value>=0 and value<=179):
-            print "hmax out of range: "+str(value)
+            print("hmax out of range: "+str(value))
             return False
         if not (value>=self.hsvth[0]):
-            print "hmax < hmin, setting to hmin"
+            print("hmax < hmin, setting to hmin")
             value=self.hsvth[0]
             cv2.setTrackbarPos("Hmax",self.wcname,value)
         self.hsvth[1]=value
         self.updatedisp()
     def dothreshsmin(self,value):
         if not (value>=0 and value<=255):
-            print "smin out of range: "+str(value)
+            print("smin out of range: "+str(value))
             return False
         if not (value<=self.hsvth[3]):
-            print "smin > smax, setting to smax"
+            print("smin > smax, setting to smax")
             value=self.hsvth[3]
             cv2.setTrackbarPos("Smin",self.wcname,value)
         self.hsvth[2]=value
         self.updatedisp()
     def dothreshsmax(self,value):
         if not (value>=0 and value<=255):
-            print "smax out of range: "+str(value)
+            print("smax out of range: "+str(value))
             return False
         if not (value>=self.hsvth[2]):
-            print "smax < smin, setting to smin"
+            print("smax < smin, setting to smin")
             value=self.hsvth[2]
             cv2.setTrackbarPos("Smax",self.wcname,value)
         self.hsvth[3]=value
         self.updatedisp()
     def dothreshvmin(self,value):
         if not (value>=0 and value<=255):
-            print "vmin out of range: "+str(value)
+            print("vmin out of range: "+str(value))
             return False
         if not (value<=self.hsvth[5]):
-            print "vmin > vmax, setting to vmax"
+            print("vmin > vmax, setting to vmax")
             value=self.hsvth[5]
             cv2.setTrackbarPos("Vmin",self.wcname,value)
         self.hsvth[4]=value
         self.updatedisp()
     def dothreshvmax(self,value):
         if not (value>=0 and value<=255):
-            print "vmax out of range: "+str(value)
+            print("vmax out of range: "+str(value))
             return False
         if not (value>=self.hsvth[4]):
-            print "vmax < vmin, setting to vmin"
+            print("vmax < vmin, setting to vmin")
             value=self.hsvth[4]
             cv2.setTrackbarPos("Vmax",self.wcname,value)
         self.hsvth[5]=value
         self.updatedisp()
     def printcmdlineparm(self):
-        print "-m %d -M %d -s %d -S %d -v %d -V %d" % (self.hsvth[0],self.hsvth[1],self.hsvth[2],self.hsvth[3],self.hsvth[4],self.hsvth[5])
+        print("-m %d -M %d -s %d -S %d -v %d -V %d" % (self.hsvth[0],self.hsvth[1],self.hsvth[2],self.hsvth[3],self.hsvth[4],self.hsvth[5]))
     def gui(self,image=None):
         if image is None:
             image=self.vshimage
@@ -487,7 +488,7 @@ class HSVthresh(object):
             #radii.append(radius)
 #            cv2.circle(self.imgorig,center,radius,(255,0,0))                
         #self.centersradii=zip(centers,radii)
-        self.shapefeatnames=sf.keys()
+        self.shapefeatnames=list(sf.keys())
         return self.shapefeat
     def optflow(self,previmg,currentimg):
         #cv2.calcOpticalFlowPyrLK(prevImg, nextImg, prevPts[, nextPts[, status[, err[, winSize[, maxLevel[, criteria[, flags[, minEigThreshold]]]]]]]]) → nextPts, status, err
@@ -511,7 +512,7 @@ class HSVthresh(object):
             if isgood:
                 new_pts.append([pts[0][0], pts[0][1]])
         return new_pts
-        # TODO: go on here
+    # TODO: go on here
 
 ##def channelName(value):
 ##        if (value == 0):
@@ -533,10 +534,10 @@ previmg=None
 roi=[args.xul, args.yul, args.X, args.Y]
 
 for filecnt in range(len(args.imagefilenames)):
-    print filecnt,args.imagefilenames[filecnt]
+    print (filecnt,args.imagefilenames[filecnt])
     image=cv2.imread(args.imagefilenames[filecnt])
     if image is None:
-        print "error reading image"
+        print ("error reading image")
         continue
     #print "tresholds:", args.minv, args.maxv, args.mins, args.maxs, args.minh, args.maxh
     ht=HSVthresh(image,roi,display=args.display,keypress=args.keypress,keytimeout=args.keytimeout)
@@ -547,7 +548,7 @@ for filecnt in range(len(args.imagefilenames)):
         ht.gui()
     if filecnt<numimages:
         stack.append(ht)
-        print "filling stack ",len(stack)
+        print("filling stack "+str(len(stack)))
     else:
         stack[filecnt%numimages]=ht
         #print "using stack ",filecnt%numimages
@@ -594,7 +595,7 @@ for filecnt in range(len(args.imagefilenames)):
     #cv2.imwrite(outfilename, ht.hsvtc)
 
     outfilename=outfilenamebase+".stackthresh.png"
-    print "writing to %s" % (outfilename)
+    print ("writing to "+outfilename)
     cv2.imwrite(outfilename, allt)
 
     # positions
@@ -605,10 +606,10 @@ for filecnt in range(len(args.imagefilenames)):
             csvwriter = csv.writer(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
             csvwriter.writerow(shapef[0].keys())
             csvheaderwritten=True
-        
+
     outfilename=outfilenamebase+".postions.csv"
     with open(outfilename, 'wb') as csvfile:
-        print "csvfile: "+outfilename
+        print ("csvfile: "+outfilename)
         csvwriter = csv.writer(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
         #csvwriter.writerow(['filename','cx','cy','radius'])
         rowcnt=0
